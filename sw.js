@@ -1,4 +1,4 @@
-const VERSION='stack-shell-v1.5.0';
+const VERSION='stack-shell-v1.6.0';
 const CACHE=VERSION+'-'+self.registration.scope;
 const ASSETS=['./','./index.html','./style.css','./app.js','./domain.js','./db.js','./voice.js','./currency.js','./backup.js','./money-radar-migrate.js','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(ASSETS);await self.skipWaiting?.();})());});
