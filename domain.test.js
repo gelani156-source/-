@@ -1,34 +1,11 @@
-name: Deploy Stack to GitHub Pages
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fresh} from '../domain.js';
+import {backupSnapshot,backupSummary,encryptBackup,decryptBackup} from '../backup.js';
+import {fetchCBR} from '../currency.js';
+test('snapshot removes PIN but maintains original',()=>{const data=fresh();data.settings.pin={salt:'secret',hash:'f'.repeat(64)};const snap=backupSnapshot(data);assert.equal(snap.settings.pin,null);assert.ok(data.settings.pin);assert.equal(backupSummary(snap).accounts,0);});
+test('encrypted backup roundtrip and wrong password',async()=>{const src=fresh();const ciphertext=await encryptBackup(src,'password-123');assert.equal(ciphertext.format,'stack-encrypted');assert.equal((await decryptBackup(ciphertext,'password-123')).format,'stack');await assert.rejects(()=>decryptBackup(ciphertext,'not-the-password'))});
+test('currency response validation and nominal divisor',async()=>{const old=globalThis.fetch;globalThis.fetch=async()=>({ok:true,json:async()=>({Date:'2026-10-29T11:00:00Z',Valute:{USD:{Value:80,Nominal:1},EUR:{Value:900,Nominal:10}}})});try{const data=await fetchCBR();assert.equal(data.rates.EUR,90);assert.equal(data.rates.USD,80);}finally{globalThis.fetch=old;}});
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static website
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+import {parseText} from '../domain.js';
+test('spoken amounts, thousands and income intent',()=>{assert.equal(parseText('Получил зарплату 85 тысяч').amount,8500000);assert.equal(parseText('Премия 15000').type,'income');assert.equal(parseText('Такси 430 рублей').amount,43000);assert.notEqual(parseText('Купил продукты за 850 рублей вчера').date,parseText('Купил продукты за 850 рублей').date);});
