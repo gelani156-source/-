@@ -2,3 +2,15 @@
 
 /* Stack 1.1: accessible switches, mobile voice action and theme parity */
 .switch-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 14px;background:var(--raised);border-radius:15px;color:var(--text);font-size:15px}.switch-row input{width:42px;height:25px;min-height:25px;accent-color:var(--blue);flex-shrink:0}.switch-row+.switch-row{margin-top:8px}.secondary-action{display:block;width:100%;margin:12px 0;background:var(--raised);border:1px solid var(--line);color:var(--text)}.voice-quick{background:var(--blue)!important;color:var(--bg)!important;font-weight:700}.card,.list,.list-item,.account,.banner{transition:background-color .15s,border-color .15s,color .15s}html[data-theme=light] .voice-quick{color:#fff!important}html[data-theme=light] .hero{background:linear-gradient(135deg,#d6e1ff,#b7caf6)}html[data-theme=dark] .hero{background:linear-gradient(135deg,#b8cafa,#8ea9e8)}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Stack 1.2 theme UI and contrast */
+.theme-preview{display:flex;gap:10px;margin:12px 0 18px}
+.theme-preview span{flex:1;text-align:center;padding:13px;border-radius:14px;font-weight:650;border:2px solid transparent}
+.theme-preview-light{background:#f2f3f7;color:#151821}
+.theme-preview-dark{background:#101114;color:#f5f6f8}
+html[data-theme=light] .theme-preview-light,html[data-theme=dark] .theme-preview-dark{border-color:var(--blue)}
+html[data-theme=light] .hero{background:linear-gradient(135deg,#d6e1ff,#b7caf6);color:#14203e}
+html[data-theme=dark] .hero{background:linear-gradient(135deg,#303d60,#1f2c46);color:#f2f5ff}
+html[data-theme=dark] .hero .muted,html[data-theme=dark] .hero .eyebrow{color:#b9c8ed}
+html[data-theme=dark] .hero button{background:#a7befa;color:#13223d}
+html[data-theme=dark] .hero .pill{background:#ffffff22;color:#f2f5ff}
