@@ -33,9 +33,13 @@ export function free(s,month){return total(s)-s.goals.reduce((n,g)=>n+g.saved,0)
 export function parseText(text){
  const q=new URLSearchParams(text.trim().replace(/^.*\?/,''));let value,date=today();
  if(q.has('s')&&q.has('t')){value=q.get('s');const d=q.get('t');date=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;}
- else{const clean=text.replace(/(?:остаток|баланс|доступно)[\s\S]*$/i,'');const m=clean.match(/(?:покупка|оплата|списание|зачисление|перевод|сумма|итого|потратил[аи]?|получил[аи]?)\D{0,25}(\d[\d ]*(?:[.,]\d{1,2})?)/i)||clean.match(/(\d[\d ]*(?:[.,]\d{1,2})?)\s*(?:₽|руб|RUB)/i);if(m)value=m[1];}
+ else{const clean=text.replace(/(?:остаток|баланс|доступно)[\s\S]*$/i,'');const m=clean.match(/(?:покупка|оплата|списание|зачисление|перевод|сумма|итого|потратил[аи]?|получил[аи]?)\D{0,25}(\d[\d ]*(?:[.,]\d{1,2})?)/i)||clean.match(/(\d[\d ]*(?:[.,]\d{1,2})?)\s*(?:₽|руб|RUB)/i);if(m)value=m[1];
+  if(!value){const candidate=clean.match(/(?:^|\s)(\d[\d ]*(?:[.,]\d{1,2})?)(?:\s*(?:тысяч(?:а|и|у)?|тыс\.?|руб(?:лей|ля|ль)?|₽))?(?:\s|$)/i);if(candidate)value=candidate[1];}
+  if(value&&new RegExp('(?:'+value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')\\s*(?:тысяч(?:а|и|у)?|тыс\.?)','i').test(clean))value=String(Math.round(Number(value.replace(/\s/g,'').replace(',','.'))*1000));
+  if(/вчера/i.test(clean)){const d=new Date(today()+'T12:00:00');d.setDate(d.getDate()-1);date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
+ }
  if(!value)throw Error('Не удалось выделить сумму. Введите её вручную.');
- return {amount:cents(value),date:validDate(date)?date:today(),type:/зачислен|поступлен|зарплата|получил/i.test(text)?'income':'expense',note:text.slice(0,500)};
+ return {amount:cents(value),date:validDate(date)?date:today(),type:/зачислен|поступлен|зарплата|преми[яюи]|получил/i.test(text)?'income':'expense',note:text.slice(0,500)};
 }
 export function parseCSV(text){
  text=text.replace(/^\uFEFF/,'');const first=text.split(/\r?\n/)[0],sep=(first.match(/;/g)||[]).length>=(first.match(/,/g)||[]).length?';':',';
