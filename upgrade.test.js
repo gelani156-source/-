@@ -1,34 +1,5 @@
-name: Deploy Stack to GitHub Pages
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload static website
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+test('offline shell precache, scope isolation and navigation fallback',async()=>{const code=await readFile(new URL('../sw.js',import.meta.url),'utf8'),events={},deleted=[];let assets,requested,networkCalls=0;const scope='https://test.invalid/stack/',current='stack-shell-v1.0.0-'+scope;const cache={addAll:async a=>assets=a,put:async()=>{},match:async req=>req==='./index.html'?'CACHED HTML':req?.url?.endsWith('/app.js')?'CACHED JS':undefined};const context={URL,self:{registration:{scope},location:{origin:'https://test.invalid'},addEventListener:(k,f)=>events[k]=f,clients:{claim:async()=>{}}},caches:{open:async()=>cache,keys:async()=>['unrelated','stack-shell-v0-'+scope,'stack-shell-v0-https://test.invalid/other/',current],delete:async key=>deleted.push(key)},fetch:async()=>{networkCalls++;throw Error('offline');}};vm.runInNewContext(code,context);events.install({waitUntil:p=>requested=p});await requested;assert.ok(assets.includes('./app.js'));assert.ok(assets.includes('./domain.js'));assert.ok(assets.includes('./icon-512.png'));events.activate({waitUntil:p=>requested=p});await requested;assert.deepEqual(deleted,['stack-shell-v0-'+scope,current]);events.fetch({request:{method:'GET',url:scope,mode:'navigate'},respondWith:p=>requested=p});assert.equal(await requested,'CACHED HTML');events.fetch({request:{method:'GET',url:scope+'app.js'},respondWith:p=>requested=p});assert.equal(await requested,'CACHED JS');assert.ok(networkCalls>=2);let handled=false;events.fetch({request:{method:'GET',url:'https://other.invalid/'},respondWith:()=>handled=true});assert.equal(handled,false);});
