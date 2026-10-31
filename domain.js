@@ -4,7 +4,7 @@ export const uid=()=>{const b=crypto.getRandomValues(new Uint8Array(16));b[6]=(b
 export const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 export function cents(value){const s=String(value).trim().replace(/\s/g,'').replace(',','.');if(!/^-?\d+(\.\d{1,2})?$/.test(s))throw Error('Введите сумму с точностью до копеек');const n=Math.round(Number(s)*100);if(!Number.isSafeInteger(n)||Math.abs(n)>1e12)throw Error('Сумма слишком велика');return n;}
 export function validDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T12:00:00Z');return !isNaN(d)&&d.toISOString().slice(0,10)===s;}
-export function fresh(){return {format:'stack',version:1,revision:0,accounts:[],transactions:[],categories:[['Продукты',1,'basket'],['Кафе',1,'cup'],['Транспорт',1,'car'],['Покупки',2,'bag'],['Жильё',0,'home'],['Связь',0,'phone'],['Здоровье',1,'heart'],['Отдых',2,'sun'],['Зарплата',2,'wallet'],['Прочее',1,'dots']].map(([name,section,icon])=>({id:uid(),name,section,icon,hidden:false})),budgets:{},goals:[],loans:[],recurring:[],templates:[],settings:{theme:'system',lastBackup:null,pin:null,rates:{RUB:1,USD:100,EUR:110},ratesDate:null}};}
+export function fresh(){return {format:'stack',version:1,revision:0,accounts:[],transactions:[],categories:[['Продукты',1,'basket'],['Кафе',1,'cup'],['Транспорт',1,'car'],['Покупки',2,'bag'],['Поездки',2,'sun'],['Спорт',2,'heart'],['Жильё',0,'home'],['Связь',0,'phone'],['Здоровье',1,'heart'],['Отдых',2,'sun'],['Зарплата',2,'wallet'],['Прочее',1,'dots']].map(([name,section,icon])=>({id:uid(),name,section,icon,hidden:false})),budgets:{},goals:[],loans:[],recurring:[],templates:[],settings:{theme:'system',lastBackup:null,pin:null,rates:{RUB:1,USD:100,EUR:110},ratesDate:null}};}
 export const balance=(s,id)=>s.accounts.find(a=>a.id===id).initial+s.transactions.filter(t=>!t.deleted).reduce((n,t)=>n+t.splits.filter(p=>p.accountId===id).reduce((v,p)=>v+p.amount,0),0);
 export const amount=t=>t.type==='transfer'?t.splits.filter(p=>p.amount>0).reduce((n,p)=>n+p.amount,0):Math.abs(t.splits.reduce((n,p)=>n+p.amount,0));
 export const rub=(s,n,currency)=>Math.round(n*s.settings.rates[currency]);
@@ -66,3 +66,23 @@ export function validateBackup(s){
  return s;
 }
 export function ics(s){const esc=x=>String(x).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');const month=today().slice(0,7);const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Stack//Payments//RU','CALSCALE:GREGORIAN'];for(const r of s.recurring){const date=dueDate(r,month).replaceAll('-','');lines.push('BEGIN:VEVENT',`UID:${r.id}@stack.local`,`DTSTAMP:${today().replaceAll('-','')}T000000Z`,`DTSTART;VALUE=DATE:${date}`,`RRULE:FREQ=MONTHLY;BYMONTHDAY=${r.day>=29?r.day+',-1;BYSETPOS=1':r.day}`,`SUMMARY:${esc(r.name)}`,`DESCRIPTION:${esc('Плановый платёж: '+(r.amount/100)+' '+s.accounts.find(a=>a.id===r.accountId).currency+'. Отметьте оплату в Stack.')}`,'BEGIN:VALARM',`TRIGGER:-P${r.before||0}D`,'ACTION:DISPLAY',`DESCRIPTION:${esc(r.name)}`,'END:VALARM','END:VEVENT');}lines.push('END:VCALENDAR');return lines.map(line=>{let out='',len=0;for(const char of line){const n=new TextEncoder().encode(char).length;if(len+n>75){out+='\r\n ';len=1;}out+=char;len+=n;}return out;}).join('\r\n')+'\r\n';}
+
+// Conservative rules: suggestions are never applied to existing entries without confirmation.
+export function suggestCategory(note,type='expense'){
+ const q=String(note||'').toLocaleLowerCase('ru');
+ const rules=type==='income' ? [
+ ['Зарплата',/зарплат|аванс|оплата труда|оклад/i],
+ ['Премия',/преми[яюи]|бонус от работодателя/i],
+ ['Возврат долга',/вернул долг|возврат долг|долг вернули/i]
+ ] : [
+ ['Продукты',/пят[её]рочк|магнит|перекр[её]сток|лента|ашан|продукт|супермаркет|овощи|фрукты|продовольств/i],
+ ['Кафе',/кафе|ресторан|кофейн|coffee|доставка еды|пицц|суши/i],
+ ['Спорт',/фитнес|тренаж[её]р|спортзал|абонемент в зал|спортпит|протеин|креатин|фитнес-клуб/i],
+ ['Поездки',/авиабилет|авиакомпан|самолет|самол[её]т|отель|гостиниц|бронирование отеля|поездка|путешеств|жд билет|ж\/д билет/i],
+ ['Транспорт',/такси|яндекс go|бензин|азс|парковк|метро|автобус|проезд/i],
+ ['Здоровье',/аптек|врач|анализы|стоматолог|лекарств/i],
+ ['Связь',/телефон|связь|интернет|мобильн|оператор/i]
+ ];
+ for(const [name,re] of rules)if(re.test(q))return {name,confidence:'high'};
+ return null;
+}
