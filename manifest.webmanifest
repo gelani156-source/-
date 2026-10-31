@@ -1,1 +1,26 @@
-{"id":"./","name":"Stack — личные финансы","short_name":"Stack","description":"Личный бюджет на вашем устройстве","lang":"ru","start_url":"./","scope":"./","display":"standalone","background_color":"#101114","theme_color":"#101114","icons":[{"src":"./icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"./icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "id": "./",
+  "name": "STACK — личные финансы",
+  "short_name": "STACK",
+  "description": "Личный бюджет на вашем устройстве",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
