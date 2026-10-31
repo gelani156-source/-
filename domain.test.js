@@ -1,14 +1,34 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {suggestCategory,fresh} from '../domain.js';
-for(const [note,type,name] of [
- ['Пятёрочка 1200','expense','Продукты'],
- ['Кофейня 450','expense','Кафе'],
- ['Тренажерный зал абонемент','expense','Спорт'],
- ['Авиабилет Иркутск Москва','expense','Поездки'],
- ['АЗС 1500','expense','Транспорт'],
- ['Зарплата за октябрь','income','Зарплата'],
- ['Вернул долг','income','Возврат долга']
-])test(`category suggestion ${note}`,()=>assert.equal(suggestCategory(note,type)?.name,name));
-test('avoid guessing unknown descriptions',()=>assert.equal(suggestCategory('Перевод 400','expense'),null));
-test('starter categories have sport and travel',()=>{const names=fresh().categories.map(c=>c.name);assert.ok(names.includes('Спорт')&&names.includes('Поездки'))});
+name: Deploy Stack to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

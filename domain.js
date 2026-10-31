@@ -9,6 +9,7 @@ export const balance=(s,id)=>s.accounts.find(a=>a.id===id).initial+s.transaction
 export const amount=t=>t.type==='transfer'?t.splits.filter(p=>p.amount>0).reduce((n,p)=>n+p.amount,0):Math.abs(t.splits.reduce((n,p)=>n+p.amount,0));
 export const rub=(s,n,currency)=>Math.round(n*s.settings.rates[currency]);
 export const txRub=(s,t)=>t.splits.reduce((n,p)=>n+rub(s,Math.abs(p.amount),s.accounts.find(a=>a.id===p.accountId).currency),0);
+export const txRubForAccount=(s,t,accountId)=>t.splits.filter(p=>p.accountId===accountId).reduce((n,p)=>n+rub(s,Math.abs(p.amount),s.accounts.find(a=>a.id===p.accountId).currency),0);
 export function validateTx(s,t){
  if(!['expense','income','transfer'].includes(t.type)||!validDate(t.date))throw Error('Некорректный тип или дата');
  if(!Array.isArray(t.splits)||!t.splits.length||t.splits.length>30)throw Error('Выберите счёт');
