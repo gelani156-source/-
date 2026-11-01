@@ -227,19 +227,46 @@ function receiptCapture(mode='text'){
   script.onerror=()=>{script.remove();reject(Error('Нет доступа к библиотеке OCR. Проверьте интернет.'));};
   document.head.appendChild(script);
  });
+ const qrTimeout=(promise,ms,label)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label)),ms);Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)});});
+ const decodeQR=async file=>{
+  // Safari/iOS may omit BarcodeDetector: use jsQR on image pixels as a fallback.
+  let image;
+  const url=URL.createObjectURL(file);
+  try{
+   image=await qrTimeout(new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Не удалось открыть изображение'));img.src=url;}),12000,'Загрузка изображения заняла слишком много времени');
+   const maxSide=1800,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));
+   const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('Не удалось прочитать изображение');ctx.drawImage(image,0,0,canvas.width,canvas.height);
+   if('BarcodeDetector' in window){
+    try{const detector=new window.BarcodeDetector({formats:['qr_code']});const hits=await qrTimeout(detector.detect(canvas),6000,'Встроенный сканер не отвечает');if(hits?.[0]?.rawValue)return hits[0].rawValue;}catch(err){console.warn('BarcodeDetector fallback:',err);}
+   }
+   if(typeof window.jsQR!=='function'){
+    status.textContent='Загружаем сканер QR…';
+    await qrTimeout(new Promise((resolve,reject)=>{const id='stack-jsqr';let script=document.getElementById(id);if(window.jsQR)return resolve();if(script){script.addEventListener('load',resolve,{once:true});script.addEventListener('error',()=>reject(Error('Не удалось загрузить QR-сканер')),{once:true});return;}script=document.createElement('script');script.id=id;script.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';script.onload=resolve;script.onerror=()=>{script.remove();reject(Error('Не удалось загрузить QR-сканер. Проверьте интернет.'))};document.head.appendChild(script);}),15000,'Истекло время загрузки QR-сканера');
+   }
+   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);const result=window.jsQR(pixels.data,pixels.width,pixels.height,{inversionAttempts:'attemptBoth'});
+   if(!result?.data)throw Error('QR-код не найден. Попробуйте приблизить QR и сфотографировать его без бликов.');
+   return result.data;
+  }finally{URL.revokeObjectURL(url);}
+ };
+ const guessReceiptCategory=text=>{
+  // Prefer goods and merchant name; ignore fiscal boilerplate and monetary lines.
+  const relevant=String(text).split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!/^(?:итого|итог|всего|сумма|ндс|наличн|безналичн|получено|предоплата|кассир|фн|фд|фп|инн|рн ккт|приход|место расчет|кассов|онлайн.касса)/i.test(x)).slice(0,30).join(' ');
+  const match=D.suggestCategory(relevant,'expense');if(match)return state.categories.find(c=>c.name.toLocaleLowerCase('ru')===match.name.toLocaleLowerCase('ru'))?.id;
+  const goods=[['Продукты',/чипс|колбас|хлеб|молок|сыр|яйц|кефир|мясо|куриц|сок|сахар|гречк|рис|макарон|круп|печень|шоколад|конфет|йогурт|масл[оа]|батон|булоч|пельмен|овощ|фрукт|яблок|банан|огурц|помидор/i],['Здоровье',/таблет|лекарств|витамин|препарат|аптек/i],['Транспорт',/бензин|дизел|топлив|азс/i],['Покупки',/одежд|носки|футболк|куртк|обувь/i]];
+  for(const [name,re] of goods)if(re.test(relevant))return state.categories.find(c=>c.name===name)?.id;
+  return null;
+ };
  const processReceiptFile=async event=>{
   const file=event.target.files?.[0];if(!file)return;
   if(file.size>15*1024*1024){status.textContent='Максимальный размер изображения — 15 МБ';return;}
   const review=$('#receipt-review');review.disabled=true;
-  status.textContent=mode==='qr'?'Ищем QR-код…':'Загружаем распознавание чека… (первый запуск требует интернет)';
+  status.textContent=mode==='qr'?'Сканируем QR-код…':'Загружаем распознавание чека… (первый запуск требует интернет)';
   let worker=null,bitmap=null;
   try{
    if(mode==='qr'){
-    if(!('BarcodeDetector' in window))throw Error('Safari не поддерживает чтение QR из фото. Используйте «Команды» → «Сканировать QR-код» и вставьте строку.');
-    bitmap=await createImageBitmap(file);
-    const detector=new window.BarcodeDetector({formats:['qr_code']});const codes=await detector.detect(bitmap);
-    if(!codes.length)throw Error('QR-код на фотографии не обнаружен.');
-    raw.value=codes[0].rawValue;status.textContent='QR прочитан. Проверьте сумму перед сохранением.';
+    raw.value=await qrTimeout(decodeQR(file),35000,'Сканирование QR заняло слишком много времени. Попробуйте обрезать фото ближе к QR-коду.');
+    status.textContent='QR прочитан. Нажмите «Проверить операцию». ';
     return;
    }
    const Tesseract=await loadOCR();
@@ -270,7 +297,9 @@ function receiptCapture(mode='text'){
    const matchedDate=text.match(/(?:^|\s)(\d{2})[.\-/](\d{2})[.\-/](20\d{2})(?:\s|$)/m);
    const isoDate=matchedDate?`${matchedDate[3]}-${matchedDate[2]}-${matchedDate[1]}`:D.today();
    const note=(text.split(/\r?\n/).map(s=>s.trim()).find(s=>s.length>2&&!/^(?:кассов|онлайн|итог|чек|фд|фп|фн)/i.test(s))||'Покупка по чеку').slice(0,100);
-   txForm(undefined,{type:'expense',amount:parsed.amount,date:isoDate,note});
+   const categoryId=guessReceiptCategory(text);
+   if(!categoryId)toast('Категория не определена — выберите её вручную.');
+   txForm(undefined,{type:'expense',amount:parsed.amount,date:isoDate,note,...(categoryId?{categoryId}:{})});
   }catch(err){const el=$('#receipt-status');if(el)el.textContent=err.message;else toast(err.message);}
  }
 }
