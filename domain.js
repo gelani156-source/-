@@ -31,6 +31,29 @@ export function dueDate(r,month){const [y,m]=month.split('-').map(Number);return
 export function unpaid(s,month){return s.recurring.filter(r=>!s.transactions.some(t=>!t.deleted&&t.recurringId===r.id&&t.recurringMonth===month));}
 export function total(s){return s.accounts.reduce((n,a)=>n+rub(s,balance(s,a.id),a.currency),0);}
 export function free(s,month){return total(s)-s.goals.reduce((n,g)=>n+g.saved,0)-unpaid(s,month).reduce((n,r)=>n+rub(s,r.amount,s.accounts.find(a=>a.id===r.accountId).currency),0);}
+// Receipt OCR is intentionally stricter than free-form speech/SMS parsing.
+// Never turn item prices, quantities, VAT rates or cash tendered into a receipt total.
+export function parseReceiptTotal(text){
+ const lines=String(text||'').replace(/\u00a0/g,' ').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+ const amountPattern=/(?<!\d)(\d{1,9}(?:[\s\u00a0]\d{3})*[.,]\d{2})(?!\d)/g;
+ const amounts=s=>[...s.matchAll(amountPattern)].map(m=>({raw:m[1],number:Number(m[1].replace(/\s/g,'').replace(',','.'))})).filter(x=>Number.isFinite(x.number)&&x.number>0&&x.number<=1e9);
+ const totalLabel=/^(?:[=:\s\-–]*)(?:итог(?:о)?|всего(?:\s+к\s+оплате)?|к\s+оплате|сумма\s+чека|итоговая\s+сумма|итого\s+к\s+оплате)(?=\s|[:=]|$|\d)/i;
+ const exclusions=/ндс|сдач[аиу]|скидк|предоплат|аванс|наличн|безналичн|получен|внесен|оплачено|сумма\s+ндс|кассир|итог\s+скидк/i;
+ const candidates=[];
+ for(let i=0;i<lines.length;i++){
+  const line=lines[i];
+  if(exclusions.test(line)||!totalLabel.test(line))continue;
+  let found=amounts(line.replace(totalLabel,''));
+  // The total may be wrapped onto the next line by OCR.
+  if(!found.length && i+1<lines.length && !exclusions.test(lines[i+1]) && !/[А-Яа-яA-Za-z]/.test(lines[i+1].replace(/[₽рРуб.]/g,'')))found=amounts(lines[i+1]);
+  for(const a of found)candidates.push({amount:cents(a.raw.replace(/\s/g,'')),line:i,label:line});
+ }
+ if(!candidates.length)throw Error('Не найдена надёжная строка «ИТОГО» или «К ОПЛАТЕ». Проверьте чек и введите итог вручную.');
+ const unique=[...new Set(candidates.map(x=>x.amount))];
+ if(unique.length!==1)throw Error('Найдены разные итоговые суммы. Выберите правильную вручную.');
+ return {amount:unique[0],source:'receipt-total',evidence:candidates[0].label};
+}
+
 export function parseText(text){
  const q=new URLSearchParams(text.trim().replace(/^.*\?/,''));let value,date=today();
  if(q.has('s')&&q.has('t')){value=q.get('s');const d=q.get('t');date=`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;}

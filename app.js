@@ -265,7 +265,12 @@ function receiptCapture(mode='text'){
   try{const text=raw.value.trim();if(!text)throw Error('Введите текст или реквизиты чека');
    // Фискальный QR имеет ключ s. Преобразование без внешних запросов.
    if(mode==='qr'&&!/(?:^|[?&])s=/.test(text))throw Error('Не найдена сумма s= в фискальном QR');
-   openParsedText(text);
+   if(mode==='qr'){openParsedText(text);return;}
+   const parsed=D.parseReceiptTotal(text);
+   const matchedDate=text.match(/(?:^|\s)(\d{2})[.\-/](\d{2})[.\-/](20\d{2})(?:\s|$)/m);
+   const isoDate=matchedDate?`${matchedDate[3]}-${matchedDate[2]}-${matchedDate[1]}`:D.today();
+   const note=(text.split(/\r?\n/).map(s=>s.trim()).find(s=>s.length>2&&!/^(?:кассов|онлайн|итог|чек|фд|фп|фн)/i.test(s))||'Покупка по чеку').slice(0,100);
+   txForm(undefined,{type:'expense',amount:parsed.amount,date:isoDate,note});
   }catch(err){const el=$('#receipt-status');if(el)el.textContent=err.message;else toast(err.message);}
  }
 }
