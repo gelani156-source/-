@@ -87,3 +87,9 @@ dialog{border:1px solid var(--line);background:var(--card);box-shadow:0 20px 60p
 .theme-toggle-row{background:var(--raised);border:1px solid var(--line);border-radius:16px;padding:14px}.ios-switch-track{background:var(--line)}
 #toast{background:#e9f1fa;color:#162332;border:1px solid #b9cad9}
 @media(max-width:420px){.stack2-page-title{align-items:flex-start;flex-direction:column}.stack2-page-title .month{align-self:flex-end}.analytics-selects{grid-template-columns:1fr}.analytics-selects label:last-child{grid-column:auto}.container{padding-left:16px;padding-right:16px}.stack2-heading h1{font-size:27px}.stack2-section-top h2{font-size:18px}}
+
+/* STACK 2.2 — собственный стиль сохраняем, добавлен только центр ввода */
+.stack-intake-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.stack-intake-grid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;min-width:0;border:1px solid var(--border,#343a44);border-radius:16px;padding:15px 12px;background:var(--surface,#20242b);color:inherit;font-size:20px}
+.stack-intake-grid button strong{font-size:14px;font-weight:650}.stack-intake-grid button small{font-size:11px;opacity:.72;line-height:1.35}
+.stack-intake-grid button:active{transform:scale(.985)}
