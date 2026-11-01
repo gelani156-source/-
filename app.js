@@ -210,28 +210,55 @@ function notificationPaste(){
  $('#bank-review').onclick=()=>{const value=$('#bank-text').value.trim();if(!value){$('#bank-status').textContent='Вставьте текст уведомления';return;}try{openParsedText(value);}catch(err){const el=$('#bank-status');if(el)el.textContent=err.message;else toast(err.message);}}
 }
 function receiptCapture(mode='text'){
- modal(mode==='qr'?'QR-код чека':'Фото чека',`<p class="help">${mode==='qr'?'Выберите фото с QR-кодом или используйте камеру.':'Выберите фотографию чека или сделайте снимок.'} Распознавание зависит от возможностей браузера; если оно недоступно, введите итог вручную.</p>
+ modal(mode==='qr'?'QR-код чека':'Фото чека',`<p class="help">${mode==='qr'?'Выберите фото с QR-кодом или используйте камеру.':'Выберите фотографию чека или сделайте снимок.'} Для фото чека используется OCR на устройстве. При первом распознавании необходим интернет для загрузки языковых моделей. Изображение не отправляется на сервер STACK.</p>
  <label for="receipt-file">Выбрать фото из галереи</label><input id="receipt-file" type="file" accept="image/*"><label for="receipt-camera" class="gap">Или сделать снимок камерой</label><input id="receipt-camera" type="file" accept="image/*" capture="environment">
  <p id="receipt-status" class="help" role="status"></p>
  <label for="receipt-raw">${mode==='qr'?'Строка QR (можно вставить вручную)':'Распознанный текст (можно исправить)'}</label>
  <textarea id="receipt-raw" placeholder="${mode==='qr'?'t=20261101T1010&s=1250.00&fn=...':'ИТОГО 1 250,00 ₽'}"></textarea>
  <button type="button" class="primary gap" id="receipt-review">Проверить операцию</button>`)
  const status=$('#receipt-status'),raw=$('#receipt-raw');
+ const loadOCR=()=>new Promise((resolve,reject)=>{
+  if(window.Tesseract?.createWorker)return resolve(window.Tesseract);
+  const existing=document.getElementById('stack-tesseract');
+  if(existing){existing.addEventListener('load',()=>resolve(window.Tesseract),{once:true});existing.addEventListener('error',()=>reject(Error('Не удалось загрузить OCR')),{once:true});return;}
+  const script=document.createElement('script');script.id='stack-tesseract';
+  script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+  script.onload=()=>window.Tesseract?.createWorker?resolve(window.Tesseract):reject(Error('OCR не запустился'));
+  script.onerror=()=>{script.remove();reject(Error('Нет доступа к библиотеке OCR. Проверьте интернет.'));};
+  document.head.appendChild(script);
+ });
  const processReceiptFile=async event=>{
   const file=event.target.files?.[0];if(!file)return;
   if(file.size>15*1024*1024){status.textContent='Максимальный размер изображения — 15 МБ';return;}
-  status.textContent='Обрабатываем изображение…';
+  const review=$('#receipt-review');review.disabled=true;
+  status.textContent=mode==='qr'?'Ищем QR-код…':'Загружаем распознавание чека… (первый запуск требует интернет)';
+  let worker=null,bitmap=null;
   try{
-   const bitmap=await createImageBitmap(file);
-   if(mode==='qr'&&'BarcodeDetector' in window){
+   if(mode==='qr'){
+    if(!('BarcodeDetector' in window))throw Error('Safari не поддерживает чтение QR из фото. Используйте «Команды» → «Сканировать QR-код» и вставьте строку.');
+    bitmap=await createImageBitmap(file);
     const detector=new window.BarcodeDetector({formats:['qr_code']});const codes=await detector.detect(bitmap);
-    if(codes.length){raw.value=codes[0].rawValue;status.textContent='QR прочитан. Проверьте сумму перед сохранением.';}else status.textContent='QR не найден. Вставьте его содержимое вручную.';
-   }else if(mode!=='qr'&&'TextDetector' in window){
-    const detector=new window.TextDetector();const lines=await detector.detect(bitmap);
-    raw.value=lines.map(line=>line.rawValue).join('\n');status.textContent=lines.length?'Текст распознан. Проверьте итоговую сумму.':'Текст не найден. Введите сумму вручную.';
-   }else status.textContent='В этом браузере распознавание изображения недоступно. Используйте текст с чека или введите сумму вручную.';
-   bitmap.close?.();
-  }catch(err){status.textContent='Не удалось обработать изображение: '+err.message;}
+    if(!codes.length)throw Error('QR-код на фотографии не обнаружен.');
+    raw.value=codes[0].rawValue;status.textContent='QR прочитан. Проверьте сумму перед сохранением.';
+    return;
+   }
+   const Tesseract=await loadOCR();
+   status.textContent='Загружаем русский и английский языки OCR…';
+   worker=await Tesseract.createWorker('rus+eng',1,{
+    logger:message=>{
+     if(!status.isConnected)return;
+     const percent=Math.round((message.progress||0)*100);
+     const descriptions={'loading language traineddata':'Загрузка языковой модели','initializing api':'Подготовка OCR','recognizing text':'Читаем текст чека'};
+     if(descriptions[message.status])status.textContent=descriptions[message.status]+'… '+percent+'%';
+    }
+   });
+   const result=await worker.recognize(file);
+   const detected=result?.data?.text?.trim()||'';
+   if(!detected)throw Error('Текст не удалось прочитать. Попробуйте более чёткое фото без бликов.');
+   raw.value=detected;
+   status.textContent='Текст распознан. Проверьте итоговую сумму и нажмите «Проверить операцию».';
+  }catch(err){status.textContent='Распознавание не завершено: '+err.message+' Можно ввести текст вручную.';}
+  finally{try{await worker?.terminate();}catch{}try{bitmap?.close();}catch{}if(review.isConnected)review.disabled=false;}
  };
  $('#receipt-file').onchange=processReceiptFile;$('#receipt-camera').onchange=processReceiptFile;
  $('#receipt-review').onclick=()=>{
