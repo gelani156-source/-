@@ -210,7 +210,7 @@ function notificationPaste(){
  $('#bank-review').onclick=()=>{const value=$('#bank-text').value.trim();if(!value){$('#bank-status').textContent='Вставьте текст уведомления';return;}try{openParsedText(value);}catch(err){const el=$('#bank-status');if(el)el.textContent=err.message;else toast(err.message);}}
 }
 function receiptCapture(mode='text'){
- modal(mode==='qr'?'QR-код чека':'Фото чека',`<p class="help">${mode==='qr'?'Выберите фото с QR-кодом или используйте камеру.':'Выберите фотографию чека или сделайте снимок.'} Для фото чека используется OCR на устройстве. При первом распознавании необходим интернет для загрузки языковых моделей. Изображение не отправляется на сервер STACK.</p>
+ modal(mode==='qr'?'QR-код чека':'Фото чека',`<p class="help">${mode==='qr'?'Выберите фото с QR-кодом или используйте камеру.':'Выберите фотографию чека или сделайте снимок.'} Фото чека распознаётся через OCR, QR — отдельным сканером. При первом использовании может понадобиться интернет. Изображение не отправляется на сервер STACK.</p>
  <label for="receipt-file">Выбрать фото из галереи</label><input id="receipt-file" type="file" accept="image/*"><label for="receipt-camera" class="gap">Или сделать снимок камерой</label><input id="receipt-camera" type="file" accept="image/*" capture="environment">
  <p id="receipt-status" class="help" role="status"></p>
  <label for="receipt-raw">${mode==='qr'?'Строка QR (можно вставить вручную)':'Распознанный текст (можно исправить)'}</label>
@@ -228,25 +228,70 @@ function receiptCapture(mode='text'){
   document.head.appendChild(script);
  });
  const qrTimeout=(promise,ms,label)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label)),ms);Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)});});
+ const loadQRLibrary=async()=>{
+  if(typeof window.jsQR==='function')return window.jsQR;
+  const sources=['https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js','https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'];
+  for(let i=0;i<sources.length;i++){
+   status.textContent=`Загружаем QR-сканер (${i+1}/${sources.length})…`;
+   try{
+    await qrTimeout(new Promise((resolve,reject)=>{
+     const script=document.createElement('script');script.src=sources[i];script.async=true;
+     script.onload=()=>typeof window.jsQR==='function'?resolve():reject(Error('Библиотека не запустилась'));
+     script.onerror=()=>reject(Error('Сервер сканера недоступен'));
+     document.head.appendChild(script);
+    }),9000,'Сервер QR-сканера не ответил');
+    if(typeof window.jsQR==='function')return window.jsQR;
+   }catch(error){console.warn('STACK QR library:',error);}
+  }
+  throw Error('Не удалось загрузить QR-сканер. Проверьте интернет в Safari и повторите попытку.');
+ };
  const decodeQR=async file=>{
-  // Safari/iOS may omit BarcodeDetector: use jsQR on image pixels as a fallback.
-  let image;
   const url=URL.createObjectURL(file);
   try{
-   image=await qrTimeout(new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Не удалось открыть изображение'));img.src=url;}),12000,'Загрузка изображения заняла слишком много времени');
-   const maxSide=1800,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));
-   const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-   const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('Не удалось прочитать изображение');ctx.drawImage(image,0,0,canvas.width,canvas.height);
-   if('BarcodeDetector' in window){
-    try{const detector=new window.BarcodeDetector({formats:['qr_code']});const hits=await qrTimeout(detector.detect(canvas),6000,'Встроенный сканер не отвечает');if(hits?.[0]?.rawValue)return hits[0].rawValue;}catch(err){console.warn('BarcodeDetector fallback:',err);}
+   status.textContent='Открываем фотографию QR…';
+   const image=await qrTimeout(new Promise((resolve,reject)=>{
+    const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Фотография не открылась'));img.src=url;
+   }),10000,'Изображение не открылось за 10 секунд');
+   const makeCanvas=(x,y,w,h,size=1200)=>{
+    const scale=Math.min(3,size/Math.max(w,h));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('Не удалось прочитать пиксели фотографии');
+    ctx.imageSmoothingEnabled=false;ctx.drawImage(image,x,y,w,h,0,0,canvas.width,canvas.height);return canvas;
+   };
+   const w=image.naturalWidth,h=image.naturalHeight;
+   if(!w||!h)throw Error('Фотография пуста');
+   // First scan full image; then central, lower and corner areas for small printed QRs.
+   const regions=[[0,0,w,h]];
+   const side=Math.min(w,h);
+   if(Math.max(w,h)>550){
+    const sq=Math.round(side*.68);
+    regions.push([Math.round((w-sq)/2),Math.round((h-sq)/2),sq,sq]);
+    regions.push([Math.round((w-sq)/2),h-sq,sq,sq]);
+    regions.push([w-sq,h-sq,sq,sq]);
+    regions.push([0,h-sq,sq,sq]);
    }
-   if(typeof window.jsQR!=='function'){
-    status.textContent='Загружаем сканер QR…';
-    await qrTimeout(new Promise((resolve,reject)=>{const id='stack-jsqr';let script=document.getElementById(id);if(window.jsQR)return resolve();if(script){script.addEventListener('load',resolve,{once:true});script.addEventListener('error',()=>reject(Error('Не удалось загрузить QR-сканер')),{once:true});return;}script=document.createElement('script');script.id=id;script.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';script.onload=resolve;script.onerror=()=>{script.remove();reject(Error('Не удалось загрузить QR-сканер. Проверьте интернет.'))};document.head.appendChild(script);}),15000,'Истекло время загрузки QR-сканера');
+   const canvases=regions.map(([x,y,rw,rh])=>makeCanvas(x,y,rw,rh));
+   if(typeof window.BarcodeDetector==='function'){
+    status.textContent='Проверяем встроенный сканер iPhone…';
+    try{
+     const detector=new window.BarcodeDetector({formats:['qr_code']});
+     for(const canvas of canvases.slice(0,3)){
+      const hits=await qrTimeout(detector.detect(canvas),2500,'Встроенный сканер не ответил');
+      if(hits?.[0]?.rawValue)return hits[0].rawValue;
+     }
+    }catch(error){console.warn('STACK native QR:',error);}
    }
-   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);const result=window.jsQR(pixels.data,pixels.width,pixels.height,{inversionAttempts:'attemptBoth'});
-   if(!result?.data)throw Error('QR-код не найден. Попробуйте приблизить QR и сфотографировать его без бликов.');
-   return result.data;
+   const jsQR=await loadQRLibrary();
+   for(let i=0;i<canvases.length;i++){
+    status.textContent=`Ищем QR-код на фотографии… ${i+1}/${canvases.length}`;
+    const canvas=canvases[i],ctx=canvas.getContext('2d',{willReadFrequently:true});
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const hit=jsQR(pixels.data,pixels.width,pixels.height,{inversionAttempts:'attemptBoth'});
+    if(hit?.data)return hit.data;
+    // Allow UI to repaint between large synchronous decoding attempts.
+    await new Promise(resolve=>setTimeout(resolve,0));
+   }
+   throw Error('QR-код не найден. Обрежьте фотографию так, чтобы QR занимал большую часть кадра, и попробуйте ещё раз.');
   }finally{URL.revokeObjectURL(url);}
  };
  const guessReceiptCategory=text=>{
@@ -265,8 +310,8 @@ function receiptCapture(mode='text'){
   let worker=null,bitmap=null;
   try{
    if(mode==='qr'){
-    raw.value=await qrTimeout(decodeQR(file),35000,'Сканирование QR заняло слишком много времени. Попробуйте обрезать фото ближе к QR-коду.');
-    status.textContent='QR прочитан. Нажмите «Проверить операцию». ';
+    raw.value=await qrTimeout(decodeQR(file),45000,'QR-сканер не завершил работу за 45 секунд. Закройте окно и попробуйте обрезанное фото QR.');
+    status.textContent='QR прочитан! Проверьте данные и нажмите «Проверить операцию». ';
     return;
    }
    const Tesseract=await loadOCR();
@@ -284,7 +329,7 @@ function receiptCapture(mode='text'){
    if(!detected)throw Error('Текст не удалось прочитать. Попробуйте более чёткое фото без бликов.');
    raw.value=detected;
    status.textContent='Текст распознан. Проверьте итоговую сумму и нажмите «Проверить операцию».';
-  }catch(err){status.textContent='Распознавание не завершено: '+err.message+' Можно ввести текст вручную.';}
+  }catch(err){status.textContent='Распознавание не завершено: '+(err?.message||String(err))+' Для QR можно открыть чек в «Фото» iPhone, удержать код и скопировать содержимое сюда.';}
   finally{try{await worker?.terminate();}catch{}try{bitmap?.close();}catch{}if(review.isConnected)review.disabled=false;}
  };
  $('#receipt-file').onchange=processReceiptFile;$('#receipt-camera').onchange=processReceiptFile;
