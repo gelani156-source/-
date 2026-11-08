@@ -7,9 +7,24 @@ export function validDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;cons
 export function fresh(){return {format:'stack',version:1,revision:0,accounts:[],transactions:[],categories:[['Продукты',1,'basket'],['Кафе',1,'cup'],['Транспорт',1,'car'],['Покупки',2,'bag'],['Поездки',2,'sun'],['Спорт',2,'heart'],['Жильё',0,'home'],['Связь',0,'phone'],['Здоровье',1,'heart'],['Отдых',2,'sun'],['Зарплата',2,'wallet'],['Прочее',1,'dots']].map(([name,section,icon])=>({id:uid(),name,section,icon,hidden:false})),budgets:{},goals:[],loans:[],recurring:[],templates:[],settings:{theme:'system',lastBackup:null,pin:null,rates:{RUB:1,USD:100,EUR:110},ratesDate:null}};}
 export const balance=(s,id)=>s.accounts.find(a=>a.id===id).initial+s.transactions.filter(t=>!t.deleted).reduce((n,t)=>n+t.splits.filter(p=>p.accountId===id).reduce((v,p)=>v+p.amount,0),0);
 export const amount=t=>t.type==='transfer'?t.splits.filter(p=>p.amount>0).reduce((n,p)=>n+p.amount,0):Math.abs(t.splits.reduce((n,p)=>n+p.amount,0));
-export const rub=(s,n,currency)=>Math.round(n*s.settings.rates[currency]);
-export const txRub=(s,t)=>t.splits.reduce((n,p)=>n+rub(s,Math.abs(p.amount),s.accounts.find(a=>a.id===p.accountId).currency),0);
-export const txRubForAccount=(s,t,accountId)=>t.splits.filter(p=>p.accountId===accountId).reduce((n,p)=>n+rub(s,Math.abs(p.amount),s.accounts.find(a=>a.id===p.accountId).currency),0);
+export const rub=(s,n,currency)=>{const v=Math.round(Math.abs(n)*s.settings.rates[currency]);return v===0?0:Math.sign(n)*v;};
+// Round once per currency, then distribute residual kopecks deterministically
+// so account analytics add up to the operation total regardless of split order.
+function rubAllocations(s,t){
+ const groups=new Map();
+ for(const p of t.splits){const currency=s.accounts.find(a=>a.id===p.accountId).currency;const group=groups.get(currency)||[];group.push(p);groups.set(currency,group);}
+ const result=new Map();
+ for(const [currency,parts] of groups){
+  const rate=s.settings.rates[currency],total=parts.reduce((n,p)=>n+Math.abs(p.amount),0);
+  const rows=parts.map(p=>{const raw=Math.abs(p.amount)*rate,base=Math.floor(raw);return {id:p.accountId,base,fraction:raw-base};});
+  let remainder=rub(s,total,currency)-rows.reduce((n,p)=>n+p.base,0);
+  rows.sort((a,b)=>b.fraction-a.fraction||(a.id<b.id?-1:a.id>b.id?1:0));
+  for(const row of rows){const extra=remainder>0?1:0;remainder-=extra;result.set(row.id,(result.get(row.id)||0)+row.base+extra);}
+ }
+ return result;
+}
+export const txRub=(s,t)=>[...rubAllocations(s,t).values()].reduce((n,v)=>n+v,0);
+export const txRubForAccount=(s,t,accountId)=>rubAllocations(s,t).get(accountId)||0;
 export function validateTx(s,t){
  if(!['expense','income','transfer'].includes(t.type)||!validDate(t.date))throw Error('Некорректный тип или дата');
  if(!Array.isArray(t.splits)||!t.splits.length||t.splits.length>30)throw Error('Выберите счёт');
@@ -28,7 +43,19 @@ export function stats(s,month,date=today()){
  return {income,expense,spent,cats,budget,days,limit,todaySpent,leftToday:limit-todaySpent};
 }
 export function dueDate(r,month){const [y,m]=month.split('-').map(Number);return `${month}-${String(Math.min(r.day,new Date(y,m,0).getDate())).padStart(2,'0')}`;}
-export function unpaid(s,month){return s.recurring.filter(r=>!s.transactions.some(t=>!t.deleted&&t.recurringId===r.id&&t.recurringMonth===month));}
+// Payment links identify the covered month even if the schedule or payment
+// details are edited. A deleted operation or one changed to income/transfer
+// no longer represents a payment.
+export function unpaid(s,month){return s.recurring.filter(r=>!s.transactions.some(t=>!t.deleted&&t.type==='expense'&&t.recurringId===r.id&&t.recurringMonth===month));}
+export function recordRecurringPayment(s,id,month,date,value){
+ const r=s.recurring.find(x=>x.id===id);
+ if(!r)throw Error('Платёж не найден');
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('Некорректный месяц платежа');
+ if(!unpaid(s,month).some(x=>x.id===id))throw Error('Этот платёж уже оплачен');
+ const amount=cents(value);if(amount<=0)throw Error('Сумма должна быть больше нуля');
+ const t={id:uid(),type:'expense',date,categoryId:r.categoryId,note:r.name,splits:[{accountId:r.accountId,amount:-amount}],recurringId:r.id,recurringMonth:month,created:new Date().toISOString()};
+ validateTx(s,t);s.transactions.push(t);return t;
+}
 export function total(s){return s.accounts.reduce((n,a)=>n+rub(s,balance(s,a.id),a.currency),0);}
 export function free(s,month){return total(s)-s.goals.reduce((n,g)=>n+g.saved,0)-unpaid(s,month).reduce((n,r)=>n+rub(s,r.amount,s.accounts.find(a=>a.id===r.accountId).currency),0);}
 // Receipt OCR is intentionally stricter than free-form speech/SMS parsing.

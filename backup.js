@@ -1,6 +1,11 @@
-import {validateBackup} from './domain.js';
+import {validateBackup} from './domain.js?v=2.2.7';
 const enc=new TextEncoder();const dec=new TextDecoder();
-const b64=b=>btoa(String.fromCharCode(...b));
+const b64=b=>{
+ // Every non-final chunk must contain a multiple of three bytes to avoid padding in the middle.
+ const chunkSize=0x6000,parts=[];
+ for(let i=0;i<b.length;i+=chunkSize)parts.push(btoa(String.fromCharCode(...b.subarray(i,i+chunkSize))));
+ return parts.join('');
+};
 const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 export function backupSnapshot(state){const value=structuredClone(state);value.settings.pin=null;return validateBackup(value);}
 export function backupSummary(value){validateBackup(value);return {accounts:value.accounts.length,transactions:value.transactions.filter(t=>!t.deleted).length,categories:value.categories.length};}
