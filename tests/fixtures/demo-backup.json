@@ -1,0 +1,1 @@
+{"schemaVersion":2,"accounts":[{"id":"test-account-1","balance":10000}],"categories":[{"id":"test-category-1"}],"transactions":[{"id":"test-transaction-1","accountId":"test-account-1","amount":-1200}]}
