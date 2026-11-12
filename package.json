@@ -1,9 +1,13 @@
 {
-  "name": "stack-finance",
-  "version": "2.2.0",
+  "name": "stack-3-r0-toolkit",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Stack 3.0 R0: read-only diagnostics, backup verification and baseline tests",
   "scripts": {
-    "test": "node --test tests/*.test.js"
-  }
+    "test": "node --test tests/*.test.js",
+    "audit": "node tools/audit-project.mjs",
+    "verify": "node tools/verify-backup.mjs"
+  },
+  "engines": {"node": ">=20"}
 }
