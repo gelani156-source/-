@@ -1,4 +1,4 @@
-import {validateBackup} from './domain.js?v=2.2.7';
+import {validateBackup} from './domain.js?v=2.2.12';
 const enc=new TextEncoder();const dec=new TextDecoder();
 const b64=b=>{
  // Every non-final chunk must contain a multiple of three bytes to avoid padding in the middle.

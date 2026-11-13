@@ -1,7 +1,7 @@
 // Bump this version with every shell release, including changes to index.html or its assets.
-const VERSION='stack-shell-v2.2.7';
+const VERSION='stack-shell-v2.2.12';
 const CACHE=VERSION+'-'+self.registration.scope;
-const ASSETS=['./','./index.html','./style.css?v=2.2.7','./app.js?v=2.2.7','./domain.js?v=2.2.7','./db.js?v=2.2.7','./voice.js?v=2.2.7','./currency.js?v=2.2.7','./backup.js?v=2.2.7','./money-radar-migrate.js?v=2.2.7','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png'];
+const ASSETS=['./','./index.html','./style.css?v=2.2.8','./app.js?v=2.2.12','./insights.js?v=2.2.12','./simulator.js?v=2.2.9','./health.js?v=2.2.12','./domain.js?v=2.2.12','./db.js?v=2.2.12','./voice.js?v=2.2.7','./currency.js?v=2.2.7','./backup.js?v=2.2.12','./money-radar-migrate.js?v=2.2.7','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil((async()=>{const c=await caches.open(CACHE);await c.addAll(ASSETS.map(url=>new Request(new URL(url,self.registration.scope),{cache:'reload'})));})());});
 // Do not force activation or claim existing clients: an old page must keep its old shell.
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith('stack-shell-')&&name.endsWith('-'+self.registration.scope)&&name!==CACHE)await caches.delete(name);})());});

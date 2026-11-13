@@ -93,3 +93,37 @@ dialog{border:1px solid var(--line);background:var(--card);box-shadow:0 20px 60p
 .stack-intake-grid button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;min-width:0;border:1px solid var(--border,#343a44);border-radius:16px;padding:15px 12px;background:var(--surface,#20242b);color:inherit;font-size:20px}
 .stack-intake-grid button strong{font-size:14px;font-weight:650}.stack-intake-grid button small{font-size:11px;opacity:.72;line-height:1.35}
 .stack-intake-grid button:active{transform:scale(.985)}
+
+/* Stack 3 · visual refresh; presentation only */
+:root{--bg:#10151c;--card:#1b2530;--raised:#253441;--line:#394a58;--text:#f1f6f7;--muted:#b0bec7;--blue:#78cbbf;--nav:rgba(18,27,34,.96)}
+html[data-theme=light]{--bg:#f3f5f2;--card:#fff;--raised:#edf2ef;--line:#d7e3dc;--text:#1b302a;--muted:#586d64;--blue:#147766;--green:#08734e;--red:#b83c48;--nav:rgba(250,252,249,.97)}
+body{background:var(--bg);color:var(--text)}
+header .brand .icon{color:var(--blue)}
+header .plain{border:1px solid var(--line);background:var(--card);min-width:44px;min-height:44px;border-radius:14px}
+.stack2-heading .eyebrow,.stack2-page-title .eyebrow{letter-spacing:.14em;font-weight:750}
+.stack2-private{background:var(--card);font-size:12px}
+.stack2-balance{position:relative;background:linear-gradient(135deg,#183c39,#142c32 65%,#172733);border:1px solid #41665c;box-shadow:0 16px 38px #0002;padding:26px;border-radius:24px}
+.stack2-balance::after{content:'';position:absolute;right:-80px;top:-120px;width:260px;height:260px;border:1px solid #ffffff18;border-radius:50%;pointer-events:none}
+.stack2-kicker{color:#bad5ca;font-weight:700}.stack2-total{letter-spacing:-.045em}.stack2-free b{color:#91e4c0}
+.stack2-spark span{background:linear-gradient(180deg,#98dfc5,#3c9182)}.stack2-spark span.today{background:linear-gradient(180deg,#d3f9e0,#74cdb0)}
+.stack2-card,.stack2-metric,.stack2-account,.card,.list,.toolbar{box-shadow:0 5px 20px #071b1208}
+.stack2-metric,.stack2-account{border-radius:18px}.stack2-card{padding:22px}.stack2-track>span{background:linear-gradient(90deg,#378f7d,#91d3b6)}
+.stack2-section-top button{min-height:44px;padding:8px 4px}.stack2-budget{margin-top:20px}.stack2-between{font-size:13px}
+.stack2-account strong,.money{overflow-wrap:anywhere}.list-item .grow{min-width:0}.list-item .grow strong{overflow-wrap:anywhere}
+.stack-intake-grid button{background:var(--raised);border-color:var(--line);color:var(--text)}
+.primary,nav .add{background:#187d6c!important;color:#fff!important}.primary:hover,nav .add:hover{background:#126958!important}nav .add{box-shadow:0 4px 16px #167b6d55}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+button{touch-action:manipulation}dialog{border-radius:24px}dialog::backdrop{background:#06130db3}
+@media(min-width:900px){
+ .container{max-width:1200px;padding-left:150px;padding-right:40px;padding-bottom:60px}
+ nav{top:110px;bottom:auto;left:max(18px,calc((100vw - 1200px)/2));transform:none;width:112px;display:flex;flex-direction:column;gap:8px;padding:12px 8px;border-radius:22px}
+ nav button{width:100%;min-height:54px;border-radius:13px}nav button.active{background:var(--raised)}nav .add{width:100%;height:52px}
+ .stack2-home{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 22px;align-items:start}
+ .stack2-heading,.stack2-alert,.stack2-balance,.stack2-metrics,.stack2-card,.stack2-section-top,.stack2-accountscroll,.stack2-home>.list,.stack2-home>.empty,.stack2-footnote{grid-column:1/-1}
+ .stack2-balance{grid-column:1;min-height:230px}.stack2-metrics{grid-column:2;grid-template-columns:1fr;align-self:stretch}.stack2-metric{align-content:center}
+ .stack2-account{flex-basis:190px}.stack2-accountscroll{overflow-x:auto}.stack2-footnote{margin-top:5px}
+}
+@media(max-width:420px){.stack2-balance{padding:21px}.stack2-card{padding:17px}.stack2-between{flex-wrap:wrap}.stack2-account strong{font-size:15px}.toolbar{grid-template-columns:1fr}.stack2-private{padding:7px 9px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.onboard .mark{background:#b9e4d3;color:#174a40}

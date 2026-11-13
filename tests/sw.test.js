@@ -58,7 +58,7 @@ test('precache uses actual index URLs and serves a complete shell offline',async
   const h=harness();await h.lifecycle('install');await h.lifecycle('activate');h.offline();
   const page=await h.request('./?from=offline',{mode:'navigate'});
   assert.equal(page.body,html);
-  for(const asset of [js,css,...['domain.js','db.js','voice.js','currency.js','backup.js','money-radar-migrate.js'].map(name=>`./${name}?v=2.2.7`),'./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png']){
+  for(const asset of [js,css,...['domain.js','db.js','backup.js'].map(name=>`./${name}?v=2.2.12`),...['voice.js','currency.js','money-radar-migrate.js'].map(name=>`./${name}?v=2.2.7`),'./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png']){
     assert.equal((await h.request(asset)).body,`asset:${asset}`,asset);
   }
   assert.equal(h.calls.length,0,'offline shell must not need the network');
@@ -102,14 +102,14 @@ test('missing offline navigation returns an error; cache write failure preserves
 });
 
 test('legacy cache cannot supply old app, CSS or module URLs to the new shell',async()=>{
-  const modules=['app.js','domain.js','db.js','voice.js','currency.js','backup.js','money-radar-migrate.js'];
+  const modules=['app.js','insights.js','simulator.js','health.js','domain.js','db.js','voice.js','currency.js','backup.js','money-radar-migrate.js'];
   const legacy=new Map([...modules,'style.css'].map(name=>[new URL('./'+name,scope).href,'old']));
   const h=harness({storage:new Map([['stack-shell-v2.2.5-'+scope,legacy]])});
   const app=await readFile(new URL('../app.js',import.meta.url),'utf8');
   const db=await readFile(new URL('../db.js',import.meta.url),'utf8');
   const backup=await readFile(new URL('../backup.js',import.meta.url),'utf8');
   const dependencies=[...app.matchAll(/from ['"](\.\/[^'"]+\.js\?v=[^'"]+)['"]/g),...db.matchAll(/from ['"](\.\/[^'"]+\.js\?v=[^'"]+)['"]/g),...backup.matchAll(/from ['"](\.\/[^'"]+\.js\?v=[^'"]+)['"]/g)].map(m=>m[1]);
-  assert.equal(dependencies.length,8);
+  assert.equal(dependencies.length,11);
   for(const asset of [js,css,...dependencies])assert.equal(legacy.has(new URL(asset,scope).href),false,asset);
   await h.lifecycle('install');h.offline();
   for(const asset of [js,css,...dependencies])assert.equal((await h.request(asset)).body,`asset:${asset}`,asset);
